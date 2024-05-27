@@ -1,49 +1,49 @@
-from selenium.webdriver import Keys
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from utils.logger import setup_logger
+from pages.base_page import BasePage
 from utils.config import Config
+from utils.locators import HomePageLocators
+from playwright.sync_api import TimeoutError  # Assuming using sync waits
 
-logger = setup_logger(__name__, 'streamer_page.log')
 
-
-class TwitchHomePage:
+class TwitchHomePage(BasePage):
     URL = Config.URL
 
-    def __init__(self, browser):
-        self.browser = browser
-        self.search_icon_locator = (By.XPATH, "//a[@href='/search' and @aria-label='Search']")
-        self.search_input_locator = (By.XPATH, "//input[@type='search' and @placeholder='Search...']")
+    def __init__(self, page):
+        super().__init__(page)
+        self.search_icon_locator = page.locator(HomePageLocators.SEARCH_ICON)
+        self.search_input_locator = page.locator(HomePageLocators.SEARCH_INPUT)
+        self.popup_close_button_locator = page.locator(HomePageLocators.POPUP_CLOSE_BUTTON)
 
     def handle_popup_message(self):
         try:
-            # Wait for the button to be visible and click it if it appears
-            close_button = WebDriverWait(self.browser, 5).until(
-                EC.visibility_of_element_located((By.XPATH, "//button[.//div[contains(text(),'Close')]]"))
-            )
-            close_button.click()
-            logger.info("Popup closed successfully.")
-        except (TimeoutException, NoSuchElementException):
-            logger.info("No popup appeared.")
+            self.popup_close_button_locator.wait_for(timeout=5000)
+            popup_close_button = self.popup_close_button_locator.first  # Extract element handle
+            popup_close_button.click()  # Click on the element handle
+            self.logger.info("Popup closed successfully.")
+        except TimeoutError:
+            self.logger.info("No popup appeared within the timeout.")
+        except Exception as e:
+            self.logger.error("Error handling popup message:", exc_info=e)
 
     def go_to_site(self):
-        logger.info("Navigating to url: {}".format(self.URL))
-        self.browser.get(self.URL)
+        self.logger.info("Navigating to url: {}".format(self.URL))
+        super().go_to_site(self.URL)  # Assuming inherited implementation
 
     def search_for(self, query):
-        search_icon = WebDriverWait(self.browser, 10).until(
-            EC.element_to_be_clickable(self.search_icon_locator)
-        )
-        logger.info("Search button is available!")
-        search_icon.click()
-        logger.info("Search button clicked!")
-        search_input = WebDriverWait(self.browser, 10).until(
-            EC.element_to_be_clickable(self.search_input_locator)
-        )
-        logger.info("Search input is available!")
-        logger.info("Introducing search text '{}' into search input field".format(query))
-        search_input.send_keys(query)
-        search_input.send_keys(Keys.ENTER)
-        logger.info("Search text entered and hit ENTER")
+        try:
+            self.search_icon_locator.wait_for(timeout=5000)
+            search_icon = self.search_icon_locator.first
+            self.logger.info("Search button available.")
+            search_icon.click()  # Click on the element handle
+            self.logger.info("Search button clicked!")
+
+            search_input = self.search_input_locator.wait_for(timeout=5000)
+            search_input = self.search_input_locator.first
+            self.logger.info("Search input is available!")
+
+            self.logger.info(f"Introducing search text '{query}' into search input field")
+            search_input.fill(query)  # Fill the search input field
+
+            search_input.press("Enter")  # Press Enter key
+            self.logger.info("Search text entered and hit ENTER")
+        except Exception as e:
+            self.logger.error("Error occurred during search:", exc_info=e)

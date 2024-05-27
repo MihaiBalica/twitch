@@ -1,35 +1,29 @@
 import pytest
-from utils.browser import get_chrome_driver
-import os
-from utils.logger import setup_logger
+from playwright.sync_api import sync_playwright
 
-logger = setup_logger(__name__, 'streamer_page.log')
 
-@pytest.fixture
-def browser(request):
-    driver = get_chrome_driver()
-    driver.implicitly_wait(10)
+@pytest.fixture(scope="session")
+def browser():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False, executable_path="/opt/google/chrome/chrome")
+        yield browser
+        browser.close()
 
-    if not os.path.exists('screenshots'):
-        os.makedirs('screenshots')
 
-    yield driver
+@pytest.fixture(scope="function")
+def context(browser):
+    context = browser.new_context(
+        user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+        record_video_dir="videos/",
+        viewport={"width": 375, "height": 812},
+        locale="en-US"
+    )
+    yield context
+    context.close()
 
-    if request.node.rep_call.failed:
-        screenshot_path = f'screenshots/{request.node.name}.png'
-        try:
-            driver.save_screenshot(screenshot_path)
-            logger.info(f"Screenshot saved to {screenshot_path}")
-        except Exception as e:
-            logger.info(f"Could not take screenshot: {e}")
 
-    driver.quit()
-
-@pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    # Execute all other hooks to obtain the report object
-    outcome = yield
-    rep = outcome.get_result()
-
-    # Set an attribute on the item for each phase of a call, so we can access it in fixtures
-    setattr(item, "rep_" + rep.when, rep)
+@pytest.fixture(scope="function")
+def page(context):
+    page = context.new_page()
+    yield page
+    page.close()

@@ -1,20 +1,25 @@
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import time
+from pages.base_page import BasePage
+from utils.locators import SearchResultsPageLocators
 
-class TwitchSearchResultsPage:
-    def __init__(self, browser):
-        self.browser = browser
-        self.search_result_locator = (By.XPATH, "//div//a[contains(@class, 'tw-link')]")
+class TwitchSearchResultsPage(BasePage):
+    def __init__(self, page):
+        super().__init__(page)
+        self.search_result_locator = page.locator(SearchResultsPageLocators.SEARCH_RESULT)
 
     def scroll_down(self, times=2):
         for _ in range(times):
-            self.browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)
+            try:
+                self.logger.info("Scrolling down")
+                self.page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                self.page.wait_for_timeout(2000)
+            except Exception as e:
+                self.logger.error("Error occurred while scrolling down:", exc_info=e)
 
     def select_first_streamer(self):
-        streamers = WebDriverWait(self.browser, 10).until(
-            EC.presence_of_all_elements_located(self.search_result_locator)
-        )
-        streamers[1].click()
+        try:
+            self.search_result_locator.wait_for(timeout=5000)
+            first_streamer = self.search_result_locator.nth(0)
+            first_streamer.click()
+            self.logger.info("Selected first streamer")
+        except Exception as e:
+            self.logger.error("Error selecting first streamer:", exc_info=e)
